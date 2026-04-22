@@ -104,21 +104,21 @@ resource "aws_security_group" "private_ssh" {
   }
 }
 
-# resource "aws_instance" "bastion" {
-#   ami                         = var.ami_id
-#   instance_type               = "t3.micro"
-#   subnet_id                   = aws_subnet.public.id
-#   associate_public_ip_address = true
-#   vpc_security_group_ids      = [aws_security_group.bastion_ssh.id]
-#   key_name                    = aws_key_pair.bastion.key_name
-#   tags = { Name = "bastion" }
-# }
+resource "aws_instance" "bastion" {
+  ami                         = var.ami_id
+  instance_type               = "t3.micro"
+  subnet_id                   = aws_subnet.public.id
+  associate_public_ip_address = true
+  vpc_security_group_ids      = [aws_security_group.bastion_ssh.id]
+  key_name                    = aws_key_pair.bastion.key_name
+  tags = { Name = "bastion" }
+}
 
 resource "aws_instance" "keycloak" {
   ami                         = var.ami_id
   instance_type               = "t3.micro"
   subnet_id                   = aws_subnet.public.id
-  associate_public_ip_address = true
+  associate_public_ip_address = false
   vpc_security_group_ids      = [aws_security_group.allow_internal.id, aws_security_group.private_ssh.id]
   key_name                    = aws_key_pair.bastion.key_name
   tags = { Name = "keycloak" }
@@ -128,7 +128,7 @@ resource "aws_instance" "wireguard" {
   ami                         = var.ami_id
   instance_type               = "t3.micro"
   subnet_id                   = aws_subnet.public.id
-  associate_public_ip_address = true
+  associate_public_ip_address = false
   vpc_security_group_ids      = [aws_security_group.allow_internal.id, aws_security_group.private_ssh.id]
   key_name                    = aws_key_pair.bastion.key_name
   tags = { Name = "wireguard" }

@@ -33,3 +33,9 @@ override.tf.json
 
 # Ignore log files
 *.log
+
+# .pem files (private keys)
+*.pem
+
+# notepad.md file for EC2 instance details
+notepad.md

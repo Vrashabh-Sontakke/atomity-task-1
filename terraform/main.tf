@@ -65,6 +65,13 @@ resource "aws_security_group" "allow_internal" {
 }
 
 resource "aws_security_group" "bastion_ssh" {
+    ingress {
+      from_port   = 8080
+      to_port     = 8080
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "Allow Keycloak UI access"
+    }
   name        = "bastion_ssh"
   description = "Allow SSH from your IP"
   vpc_id      = aws_vpc.main.id
@@ -106,7 +113,7 @@ resource "aws_security_group" "private_ssh" {
 
 resource "aws_instance" "bastion" {
   ami                         = var.ami_id
-  instance_type               = "t3.micro"
+  instance_type               = "t3.small"
   subnet_id                   = aws_subnet.public.id
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.bastion_ssh.id]
@@ -116,7 +123,7 @@ resource "aws_instance" "bastion" {
 
 resource "aws_instance" "keycloak" {
   ami                         = var.ami_id
-  instance_type               = "t3.micro"
+  instance_type               = "t3.small"
   subnet_id                   = aws_subnet.public.id
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.allow_internal.id, aws_security_group.private_ssh.id, aws_security_group.bastion_ssh.id]
@@ -126,7 +133,7 @@ resource "aws_instance" "keycloak" {
 
 resource "aws_instance" "wireguard" {
   ami                         = var.ami_id
-  instance_type               = "t3.micro"
+  instance_type               = "t3.small"
   subnet_id                   = aws_subnet.public.id
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.allow_internal.id, aws_security_group.private_ssh.id, aws_security_group.bastion_ssh.id]

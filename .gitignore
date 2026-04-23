@@ -42,3 +42,6 @@ notepad.md
 
 # Ignore direnv environment files
 .direnv
+
+# nixos iso files
+result

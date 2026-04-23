@@ -119,7 +119,7 @@ resource "aws_instance" "keycloak" {
   instance_type               = "t3.micro"
   subnet_id                   = aws_subnet.public.id
   associate_public_ip_address = true
-  vpc_security_group_ids      = [aws_security_group.allow_internal.id, aws_security_group.private_ssh.id]
+  vpc_security_group_ids      = [aws_security_group.allow_internal.id, aws_security_group.private_ssh.id, aws_security_group.bastion_ssh.id]
   key_name                    = aws_key_pair.bastion.key_name
   tags = { Name = "keycloak" }
 }
@@ -129,7 +129,7 @@ resource "aws_instance" "wireguard" {
   instance_type               = "t3.micro"
   subnet_id                   = aws_subnet.public.id
   associate_public_ip_address = true
-  vpc_security_group_ids      = [aws_security_group.allow_internal.id, aws_security_group.private_ssh.id]
+  vpc_security_group_ids      = [aws_security_group.allow_internal.id, aws_security_group.private_ssh.id, aws_security_group.bastion_ssh.id]
   key_name                    = aws_key_pair.bastion.key_name
   tags = { Name = "wireguard" }
 }

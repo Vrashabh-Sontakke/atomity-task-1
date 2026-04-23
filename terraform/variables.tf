@@ -13,6 +13,14 @@ variable "ami_id" {
   type        = string
 }
 
+data "http" "myip" {
+  url = "https://api.ipify.org"
+}
+
+locals {
+  my_ip = chomp(data.http.myip.response_body)
+}
+
 variable "my_ip_cidr" {
   description = "Your public IP in CIDR notation for SSH access (e.g., 1.2.3.4/32)"
   type        = string

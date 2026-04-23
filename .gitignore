@@ -39,3 +39,6 @@ override.tf.json
 
 # notepad.md file for EC2 instance details
 notepad.md
+
+# Ignore direnv environment files
+.direnv

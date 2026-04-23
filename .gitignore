@@ -1,3 +1,5 @@
+# Mostly Terraform + NixOS + other gitignore
+
 # Ignore Terraform and OpenTofu state files
 *.tfstate
 *.tfstate.*

@@ -1,3 +1,4 @@
+# from my learning this needs more than 2 gb of memory, else keycloak wont start, it will get OOM errors
 services:
   postgres:
     image: postgres:16-alpine

@@ -1,0 +1,21 @@
+# ~/wgportal/config/config.yaml
+core:
+  admin_user: admin@wgportal.local
+  admin_password: "wgportal-admin-pass"
+
+web:
+  external_url: "http://192.168.56.20:8888"
+  listening_address: ":8888"
+
+auth:
+  oidc:
+    - provider_name: "keycloak"
+      display_name: "Login with Keycloak"
+      base_url: "http://192.168.56.10:8080/realms/wireguard"
+      client_id: "wg-portal"
+      client_secret: "keycloak-client-secret" # after setting up realm and client, it gives as a secret for the client
+      registration_enabled: true
+      field_map:
+        email: "email"
+        firstname: "given_name"
+        lastname: "family_name"

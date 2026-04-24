@@ -37,6 +37,7 @@
 
   environment.systemPackages = with pkgs; [
     docker-compose
+    lazydocker
     curl
     jq
     vim

@@ -1,0 +1,22 @@
+# ~/wgportal/config/config.yaml
+core:
+  admin_user: admin@wgportal.local
+  admin_password: "wgportal-admin-pass"
+
+web:
+  external_url: "http://<wireguard-ec2-public-ip>:8888"  # Public IP of WireGuard EC2 instance
+  listening_address: ":8888"
+
+auth:
+  oidc:
+    - provider_name: "keycloak"
+      display_name: "Login with Keycloak"
+      base_url: "http://<keycloak-ec2-public-ip>/realms/wireguard"  # Public IP of Keycloak EC2 instance
+      client_id: "wg-portal"
+      client_secret: "keycloak-client-secret" # after setting up realm and client, it gives as a secret for the client
+      registration_enabled: true
+      field_map:
+        # no need to change this, as in keycloak we will map email to email, given_name to firstname and family_name to lastname
+        email: "email"
+        firstname: "given_name"
+        lastname: "family_name"

@@ -1,0 +1,182 @@
+# WireGuard Portal (wg-portal) on EC2 with Keycloak OIDC
+
+> This doc is generated with the help of AI but verified by me from real debugging experience. No fluff.
+
+---
+
+## Overview
+
+This guide covers deploying wg-portal v2 on an AWS EC2 instance with Keycloak as the OIDC authentication provider. wg-portal is a web UI for managing WireGuard VPN peers and configs.
+
+> ℹ️ **Memory**: wg-portal runs fine under 2 GB. A `t3.small` is sufficient.
+
+---
+
+## Architecture
+
+```
+Internet
+    |
+    ├── :51820/udp ──► [ WireGuard tunnel ]
+    |
+    └── :8888/tcp ───► [ wg-portal web UI ]
+                            |
+                            | OIDC auth (server-to-server)
+                            | :80 via private IP
+                            v
+                       [ Keycloak EC2 ]
+```
+
+Two separate EC2 instances — one for wg-portal/WireGuard, one for Keycloak. They communicate over the VPC private network for server-side OIDC token exchange. The browser communicates with Keycloak via the public IP for the login redirect.
+
+---
+
+## docker-compose.yml
+
+```yaml
+# wg-portal runs fine under 2 GB, lower limit not tested
+services:
+  wg-portal:
+    image: wgportal/wg-portal:v2
+    container_name: wg-portal
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "51820:51820/udp"   # WireGuard tunnel
+      - "8888:8888/tcp"     # wg-portal web UI
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+```
+
+---
+
+## config/config.yaml
+
+```yaml
+core:
+  admin_user: admin@wgportal.local
+  admin_password: "your-admin-password"
+
+web:
+  external_url: "http://<wireguard-ec2-PUBLIC-ip>:8888"   # What the browser hits
+  listening_address: ":8888"
+
+auth:
+  oidc:
+    - provider_name: "keycloak"
+      display_name: "Login with Keycloak"
+      base_url: "http://<keycloak-ec2-PUBLIC-ip>/realms/<realm>"   # Must match Keycloak issuer exactly
+      client_id: "wg-portal"
+      client_secret: "<secret-from-keycloak-credentials-tab>"
+      registration_enabled: true
+      field_map:
+        email: "email"
+        firstname: "given_name"
+        lastname: "family_name"
+```
+
+---
+
+## Critical Config Values
+
+| Field | Value | Why |
+|---|---|---|
+| `web.external_url` | Public IP of WireGuard EC2 | Browser follows the OIDC callback redirect to this URL |
+| `auth.oidc.base_url` | **Must match Keycloak's issuer exactly** | wg-portal fetches the OIDC discovery doc from this URL and validates that the `issuer` field in the response matches it. Private IP vs public IP mismatch = startup failure |
+
+> ⚠️ **The `base_url` must match `KC_HOSTNAME` set on Keycloak.** If Keycloak has `KC_HOSTNAME: 3.6.93.195`, then `base_url` must be `http://3.6.93.195/realms/<realm>` — not the private IP, even though both are in the same VPC.
+
+---
+
+## EC2 Security Group
+
+The WireGuard EC2 needs its **own security group** — and that security group must actually be **attached to the instance**. Defining a security group in Terraform but not including it in `vpc_security_group_ids` means none of its rules apply.
+
+```hcl
+resource "aws_instance" "wireguard" {
+  vpc_security_group_ids = [
+    aws_security_group.wireguard.id,    # <-- must include this
+    aws_security_group.private_ssh.id,
+  ]
+}
+```
+
+Required inbound rules:
+
+| Type | Protocol | Port | Source | Notes |
+|---|---|---|---|---|
+| Custom UDP | UDP | 51820 | 0.0.0.0/0 | WireGuard tunnel traffic |
+| Custom TCP | TCP | 8888 | Your IP only | wg-portal web UI |
+| SSH | TCP | 22 | Your IP only | Admin access |
+
+---
+
+## IP Address Reference
+
+This is the most confusing part of this setup — different components need different IPs for different reasons:
+
+| Config | IP to use | Why |
+|---|---|---|
+| `web.external_url` | WireGuard EC2 **public IP** | Browser hits this after OIDC callback |
+| `auth.oidc.base_url` | Keycloak EC2 **public IP** | Must match Keycloak's `KC_HOSTNAME` / issuer |
+| Keycloak redirect URI (in Keycloak admin) | WireGuard EC2 **public IP** | Browser is redirected here after login |
+| Keycloak web origins (in Keycloak admin) | WireGuard EC2 **public IP** | Browser makes CORS requests here |
+
+> ℹ️ Even though both EC2s are in the same VPC, `base_url` must use the **public IP** if `KC_HOSTNAME` is set to the public IP on Keycloak. The issuer in the OIDC discovery doc must match `base_url` exactly — mixing public/private IPs causes wg-portal to fail at startup.
+
+---
+
+## Keycloak Client Setup (for wg-portal)
+
+In Keycloak admin → `wireguard` realm → Clients → `wg-portal`:
+
+**Capability config:**
+- Client authentication: `ON`
+- Standard flow: `ON`
+
+**Access settings:**
+- Valid redirect URIs: `http://<wireguard-ec2-PUBLIC-ip>:8888/*`
+- Web origins: `http://<wireguard-ec2-PUBLIC-ip>:8888`
+
+**Get client secret:** Credentials tab → copy Client secret → paste into `config.yaml`.
+
+> ⚠️ **Check the redirect URI character by character.** A single digit typo causes `Invalid parameter: redirect_uri` from Keycloak. There is no helpful error — Keycloak just rejects the login silently from wg-portal's perspective.
+
+---
+
+## Startup and Access
+
+```bash
+# Start wg-portal
+docker compose up -d
+
+# Check logs — look for "successfully setup all external auth providers"
+docker logs -f wg-portal
+```
+
+**Healthy startup looks like:**
+```
+Configuration loaded!
+interface state restored
+Application startup complete
+started web service address=:8888
+successfully setup all external auth providers   # <-- this line confirms Keycloak OIDC is working
+```
+
+**Access:** `http://<wireguard-ec2-public-ip>:8888`
+
+You should see a login page with a **"Login with Keycloak"** button.
+
+---
+
+## Production Notes
+
+- Change the default `admin@wgportal.local` / password before exposing to the internet
+- Restrict port `8888` to known IPs in the security group — it's your VPN management UI
+- Port `51820/udp` can stay open to `0.0.0.0/0` — that's the WireGuard tunnel and needs to be reachable by VPN clients
+- Consider putting wg-portal behind a reverse proxy with HTTPS for production
+- `registration_enabled: true` lets any Keycloak user in the realm register — set to `false` and manage users manually if you want tighter control
